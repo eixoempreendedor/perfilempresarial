@@ -1,142 +1,66 @@
-# perfil.empresarial
+# Ficha Lucrativa
 
-> App: Perfil do Dono — Ranking Drag & Drop
+SaaS em **Next.js 14** para gestão de fichas técnicas, CMV e precificação para restaurantes, lanchonetes e hamburguerias.
 
-App web estático (HTML/CSS/JS) para quiz de perfil com ordenação por arrastar e cálculo DISC + comportamentos.
+## Stack
+- Next.js 14 + App Router + TypeScript
+- Tailwind CSS
+- Supabase (Auth + PostgreSQL)
+- Stripe (assinatura)
+- OpenAI API (sugestões inteligentes)
 
-## Rodar localmente
+## Rodando localmente
 
-Como é estático, basta abrir `index.html` no navegador ou servir com um servidor simples:
-
+1. Instale dependências:
 ```bash
-python3 -m http.server 8080
+npm install
+```
+2. Copie variáveis de ambiente:
+```bash
+cp .env.example .env.local
+```
+3. Preencha as chaves do Supabase, Stripe e OpenAI no `.env.local`.
+4. Rode o projeto:
+```bash
+npm run dev
+```
+5. Abra http://localhost:3000
+
+## Supabase (schema)
+- Migration inicial: `supabase/migrations/202604160001_initial_schema.sql`
+- Para aplicar com Supabase CLI:
+```bash
+supabase db push
 ```
 
-Depois acesse `http://localhost:8080`.
+## Rotas
+- `/` landing page
+- `/auth/login` e `/auth/register`
+- `/dashboard`
+- `/ingredientes`
+- `/fichas`
+- `/cardapio`
+- `/cmv`
+- `/api/openai/sugestoes`
+- `/api/stripe/checkout`
 
-## Configuração
+## Deploy Vercel
+1. Crie um novo projeto na Vercel conectando o repositório `fichalucrativa`.
+2. Defina as mesmas variáveis do `.env.example` em **Project Settings > Environment Variables**.
+3. Configure domínio customizado em **Domains**.
 
-Edite `config.js` para ajustar:
+## Email gratuito no domínio
+Opções comuns de plano gratuito:
+- **Zoho Mail (Free)**: até 5 usuários em domínio próprio.
+- **Cloudflare Email Routing**: roteia emails para uma caixa existente (Gmail/Outlook), sem inbox próprio.
+- **ImprovMX (Free)**: forwarding para uma caixa já existente.
 
-- `SUBMIT_URL`: URL do Google Apps Script (endpoint `doPost`).
-- `QUIZ_VERSION`: versão do quiz enviada no payload.
-- `SEGMENTS`, `GROUPS` e `MAP` conforme necessidade.
+Passo geral:
+1. Escolha provedor e adicione domínio.
+2. Configure registros **MX**, **SPF**, **DKIM** no DNS.
+3. Aguarde propagação e valide envio/recebimento.
 
-## Melhorias implementadas
-
-## Geração de relatório PDF
-
-O fluxo de geração de PDF foi temporariamente removido da interface enquanto preparamos a integração via Google Docs.
-
-### Upload opcional para Google Drive
-
-No `config.js`, configure `REPORT_UPLOAD_URL` com a URL do seu endpoint (Apps Script/Webhook/API):
-
-```js
-export const REPORT_UPLOAD_URL = "https://...";
-```
-
-Se configurado, após gerar o PDF o app envia `fileName`, `mimeType`, `contentBase64` e `meta` (nome, empresa, segmento, cidade e data).
-
-- Progresso com estimativa dinâmica de tempo restante.
-- Retomada de sessão via `localStorage` para evitar perda de progresso.
-- Eventos de funil (início, visualização/conclusão de grupos, resultado, submit).
-- Validação por campo no formulário final (email/WhatsApp/segmento/consentimento).
-- Honeypot anti-bot (`website`) com bloqueio silencioso.
-- Envio com timeout + retry e fallback para payload pendente em `localStorage`.
-
-## Deploy no GitHub Pages
-
-1. Suba os arquivos no repositório (branch `main`).
-2. Vá em **Settings → Pages**.
-3. Em **Build and deployment**:
-   - Source: **Deploy from a branch**
-   - Branch: `main` e pasta `/ (root)`
-4. Salve e aguarde a publicação.
-5. Acesse a URL gerada do Pages.
-
-## Payload enviado
-
-No envio final, o app faz `fetch POST` para `SUBMIT_URL` com JSON contendo:
-
-- contrato principal:
-  - `name`, `email`, `whatsapp`, `company`, `segment`, `consent`
-  - `ranking_json`, `disc_pct`, `primary`, `secondary`
-  - `behaviors_scores`, `behaviors_top`, `behaviors_bottom`
-  - `payload_json_text` (texto único em JSON formatado para a planilha)
-  - `quiz_version`, `submitted_at`
-  - `page_url`, `referrer`, `user_agent`
-  - `quiz_events`, `group_timings_ms`
-- compatibilidade legada:
-  - `nome`, `empresa`, `segmento`, `pct`, `behaviors_json`
-  - `behaviorsTop`, `behaviorsBottom`, `pageUrl`, `userAgent`, `quizVersion`
-
-## Geração de PDF dinâmico + Google Drive
-
-### Resposta curta
-
-Você **não precisa** de agente de IA para montar o PDF com variáveis dinâmicas.
-
-- Use IA apenas para **gerar o texto personalizado** de cada placeholder (opcional).
-- A montagem do PDF pode ser 100% determinística com template + substituição de chaves.
-
-### Arquitetura recomendada
-
-1. O front-end envia o resultado atual para um endpoint (`/generate-report`).
-2. O backend monta um objeto `placeholders` com todas as chaves (`{NOME_PESSOA}`, `{DISC_TIPO}`, etc.).
-3. O backend (opcionalmente) chama IA para preencher campos narrativos curtos.
-4. O backend renderiza HTML template (12 páginas A4) com as chaves preenchidas.
-5. O backend converte para PDF (Puppeteer) com controle de margens, header/footer e page-break.
-6. O backend sobe o arquivo no Google Drive e retorna `fileId` + link compartilhável.
-7. O link entra no fluxo de WhatsApp.
-
-### Fluxo sem IA (mais estável para começar)
-
-- Mapeamento direto dos dados já existentes (`name`, `company`, `segment`, `disc_pct`, `primary`, `secondary`, `behaviors_top`, `behaviors_bottom`).
-- Textos padrão por perfil DISC (biblioteca de frases fixa por tipo primário/secundário).
-- Resultado: rápido, previsível e sem custo variável por token.
-
-### Fluxo com IA (para aumentar percepção de personalização)
-
-Use IA somente para os placeholders textuais, com regras rígidas de tamanho:
-
-- `max_chars`: 90 por bullet, 220 no card “Ação prática”, etc.
-- `temperature` baixa (0.2–0.4) para consistência.
-- saída em JSON validado por schema antes de renderizar.
-
-Exemplo de campos que podem vir da IA:
-
-- `{DISC_RESUMO_1_FRASE}`
-- `{TOP_FORCAS_3}`
-- `{TOP_ATENCOES_2}`
-- `{PLANO_30D_ACAO_PRINCIPAL}`
-- `{SCRIPT_ABERTURA}` / `{SCRIPT_FECHAMENTO}`
-
-### Upload no Google Drive
-
-Opções:
-
-- **Google Drive API (service account):** melhor para backend Node/Python, com controle de pasta e permissões.
-- **Google Apps Script:** mais simples para MVP; recebe base64/arquivo e salva em pasta específica.
-
-Sugestão prática:
-
-- Pasta por mês + subpasta por segmento (`/Relatorios/2026-02/Clinicas`).
-- Nome do arquivo: `Relatorio-{NOME_EMPRESA}-{NOME_PESSOA}-{YYYYMMDD}.pdf`.
-- Permissão: `anyoneWithLink` apenas leitura para compartilhar no WhatsApp.
-
-### Ponto crítico do HTML atual do Canva
-
-No exemplo atual, o `downloadPDF()` tira **um canvas gigante da tela inteira** e “fatia” em páginas. Isso pode quebrar cortes de cards entre páginas.
-
-Para qualidade profissional:
-
-- Renderize cada `.page` separadamente (1 canvas por página) e adicione no `jsPDF` página a página; **ou**
-- gere no backend com Puppeteer (`page.pdf`) usando CSS `@page` + `page-break-*`.
-
-### Próximo passo sugerido
-
-1. Fechar o template HTML final de 12 páginas com todos os placeholders.
-2. Criar endpoint de geração (com ou sem IA).
-3. Salvar PDF no Drive e devolver link.
-4. Integrar com disparo de WhatsApp.
+## Próximos passos sugeridos
+- Implementar CRUD real com Server Actions + Supabase.
+- Adicionar proteção de rotas privadas por sessão.
+- Integrar webhook Stripe para controle de assinatura ativa.
